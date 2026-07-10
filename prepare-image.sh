@@ -8,14 +8,14 @@ echo "tsflags=nodocs" >> /etc/dnf/dnf.conf
 
 dnf upgrade -y
 
-xargs -rtd'\n' dnf install -y < /tmp/${PKGS_LIST}
+grep -v '^#' "/tmp/${PKGS_LIST}" | xargs -rtd'\n' dnf install -y
 if [ $(uname -m) = "x86_64" ]; then
     dnf install -y syslinux-nonlinux;
 fi
 
 if [[ -n "${EXTRA_PKGS_LIST:-}" ]]; then
     if [[ -s "/tmp/${EXTRA_PKGS_LIST}" ]]; then
-        xargs -rtd'\n' dnf install -y < /tmp/"${EXTRA_PKGS_LIST}"
+        grep -v '^#' "/tmp/${EXTRA_PKGS_LIST}" | xargs -rtd'\n' dnf install -y
     fi
 fi
 
