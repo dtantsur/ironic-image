@@ -20,10 +20,12 @@ on:
 env:
   # Repositories to track
   IRONIC_REPO: "openshift/openstack-ironic"
+  IPE_REPO: "openshift/openstack-ironic-prometheus-exporter"
   SUSHY_REPO: "openshift/openstack-sushy"
   NGS_REPO: "openshift/openstack-networking-generic-switch"
   # Default branches to track
   IRONIC_BRANCH: "main"
+  IPE_BRANCH: "main"
   SUSHY_BRANCH: "main"
   NGS_BRANCH: "main"
 
@@ -61,6 +63,11 @@ jobs:
           "https://api.github.com/repos/${{ env.IRONIC_REPO }}/commits/${{ env.IRONIC_BRANCH }}" | \
           jq -r '.sha')
 
+        # Get latest commit hash from ironic-prometheus-exporter repository
+        IPE_HASH=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          "https://api.github.com/repos/${{ env.IPE_REPO }}/commits/${{ env.IPE_BRANCH }}" | \
+          jq -r '.sha')
+
         # Get latest commit hash from sushy repository
         SUSHY_HASH=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
           "https://api.github.com/repos/${{ env.SUSHY_REPO }}/commits/${{ env.SUSHY_BRANCH }}" | \
@@ -72,10 +79,12 @@ jobs:
           jq -r '.sha')
 
         echo "ironic_hash=$IRONIC_HASH" >> $GITHUB_OUTPUT
+        echo "ipe_hash=$IPE_HASH" >> $GITHUB_OUTPUT
         echo "sushy_hash=$SUSHY_HASH" >> $GITHUB_OUTPUT
         echo "ngs_hash=$NGS_HASH" >> $GITHUB_OUTPUT
 
         echo "Latest Ironic commit: $IRONIC_HASH"
+        echo "Latest Ironic Prometheus Exporter commit: $IPE_HASH"
         echo "Latest Sushy commit: $SUSHY_HASH"
         echo "Latest Networking Generic Switch commit: $NGS_HASH"
 
@@ -84,14 +93,17 @@ jobs:
       run: |
         # Extract current hashes from requirements.cachito
         CURRENT_IRONIC=$(grep "^ironic @ git+" requirements.cachito | sed 's/.*@//' || echo "")
+        CURRENT_IPE=$(grep "^ironic-prometheus-exporter @ git+" requirements.cachito | sed 's/.*@//' || echo "")
         CURRENT_SUSHY=$(grep "^sushy @ git+" requirements.cachito | sed 's/.*@//' || echo "")
         CURRENT_NGS=$(grep "^networking-generic-switch @ git+" requirements.cachito | sed 's/.*@//' || echo "")
 
         echo "current_ironic=$CURRENT_IRONIC" >> $GITHUB_OUTPUT
+        echo "current_ipe=$CURRENT_IPE" >> $GITHUB_OUTPUT
         echo "current_sushy=$CURRENT_SUSHY" >> $GITHUB_OUTPUT
         echo "current_ngs=$CURRENT_NGS" >> $GITHUB_OUTPUT
 
         echo "Current Ironic hash: $CURRENT_IRONIC"
+        echo "Current Ironic Prometheus Exporter hash: $CURRENT_IPE"
         echo "Current Sushy hash: $CURRENT_SUSHY"
         echo "Current Networking Generic Switch hash: $CURRENT_NGS"
 
@@ -102,6 +114,11 @@ jobs:
 
         if [ "${{ steps.get-commits.outputs.ironic_hash }}" != "${{ steps.current-hashes.outputs.current_ironic }}" ]; then
           echo "Ironic hash changed"
+          NEED_UPDATE=true
+        fi
+
+        if [ "${{ steps.get-commits.outputs.ipe_hash }}" != "${{ steps.current-hashes.outputs.current_ipe }}" ]; then
+          echo "Ironic Prometheus Exporter hash changed"
           NEED_UPDATE=true
         fi
 
@@ -127,6 +144,7 @@ jobs:
       run: |
         # Update the file
         sed -i "s|ironic @ git+https://github.com/${{ env.IRONIC_REPO }}@.*|ironic @ git+https://github.com/${{ env.IRONIC_REPO }}@${{ steps.get-commits.outputs.ironic_hash }}|" requirements.cachito
+        sed -i "s|ironic-prometheus-exporter @ git+https://github.com/${{ env.IPE_REPO }}@.*|ironic-prometheus-exporter @ git+https://github.com/${{ env.IPE_REPO }}@${{ steps.get-commits.outputs.ipe_hash }}|" requirements.cachito
         sed -i "s|sushy @ git+https://github.com/${{ env.SUSHY_REPO }}@.*|sushy @ git+https://github.com/${{ env.SUSHY_REPO }}@${{ steps.get-commits.outputs.sushy_hash }}|" requirements.cachito
         sed -i "s|networking-generic-switch @ git+https://github.com/${{ env.NGS_REPO }}@.*|networking-generic-switch @ git+https://github.com/${{ env.NGS_REPO }}@${{ steps.get-commits.outputs.ngs_hash }}|" requirements.cachito
 
@@ -143,6 +161,7 @@ jobs:
           Update requirements.cachito with latest openshift forks commits
 
           - Ironic: ${{ steps.get-commits.outputs.ironic_hash }}
+          - Ironic Prometheus Exporter: ${{ steps.get-commits.outputs.ipe_hash }}
           - Sushy: ${{ steps.get-commits.outputs.sushy_hash }}
           - Networking Generic Switch: ${{ steps.get-commits.outputs.ngs_hash }}
         title: "NO-ISSUE: Update requirements.cachito with latest openshift forks commits"
@@ -156,11 +175,15 @@ jobs:
           #### Ironic ({0})
           - **Previous**: `{1}`
           - **New**: `{2}`
-          - **Compare**: https://github.com/{0}/compare/{1}..{2}', env.IRONIC_REPO, steps.current-hashes.outputs.current_ironic, steps.get-commits.outputs.ironic_hash) || '' }}${{ steps.get-commits.outputs.sushy_hash != steps.current-hashes.outputs.current_sushy && format('
+          - **Compare**: https://github.com/{0}/compare/{1}..{2}', env.IRONIC_REPO, steps.current-hashes.outputs.current_ironic, steps.get-commits.outputs.ironic_hash) || '' }}${{ steps.get-commits.outputs.ipe_hash != steps.current-hashes.outputs.current_ipe && format('
+          #### Ironic Prometheus Exporter ({0})
+          - **Previous**: `{1}`
+          - **New**: `{2}`
+          - **Compare**: https://github.com/{0}/compare/{1}..{2}', env.IPE_REPO, steps.current-hashes.outputs.current_ipe, steps.get-commits.outputs.ipe_hash) || '' }}${{ steps.get-commits.outputs.sushy_hash != steps.current-hashes.outputs.current_sushy && format('
           #### Sushy ({0})
           - **Previous**: `{1}`
           - **New**: `{2}`
-          - **Compare**: https://github.com/{0}/compare/{1}..{2}', env.SUSHY_REPO, steps.current-hashes.outputs.current_sushy, steps.get-commits.outputs.sushy_hash) || '' }}${{ steps.get-commits.outputs.ngs_hash != steps.current-hashes.output.current_ngs && format('
+          - **Compare**: https://github.com/{0}/compare/{1}..{2}', env.SUSHY_REPO, steps.current-hashes.outputs.current_sushy, steps.get-commits.outputs.sushy_hash) || '' }}${{ steps.get-commits.outputs.ngs_hash != steps.current-hashes.outputs.current_ngs && format('
           #### Networking Generic Switch ({0})
           - **Previous**: `{1}`
           - **New**: `{2}`
@@ -189,6 +212,7 @@ jobs:
         if [ "${{ steps.check-update.outputs.need_update }}" = "true" ]; then
           echo "Requirements updated and PR created"
           echo "- Ironic: ${{ steps.get-commits.outputs.ironic_hash }}"
+          echo "- Ironic Prometheus Exporter: ${{ steps.get-commits.outputs.ipe_hash }}"
           echo "- Sushy: ${{ steps.get-commits.outputs.sushy_hash }}"
           echo "- Networking Generic Switch: ${{ steps.get-commits.outputs.ngs_hash }}"
         else
@@ -205,9 +229,11 @@ jobs:
         NEED_UPDATE: ${{ steps.check-update.outputs.need_update }}
         CURRENT_IRONIC: ${{ steps.current-hashes.outputs.current_ironic }}
         IRONIC_HASH: ${{ steps.get-commits.outputs.ironic_hash }}
+        CURRENT_IPE: ${{ steps.current-hashes.outputs.current_ipe }}
+        IPE_HASH: ${{ steps.get-commits.outputs.ipe_hash }}
         CURRENT_SUSHY: ${{ steps.current-hashes.outputs.current_sushy }}
         SUSHY_HASH: ${{ steps.get-commits.outputs.sushy_hash }}
-        CURRENT_NGS: ${{ steps.current-hashes.output.current_ngs }}
+        CURRENT_NGS: ${{ steps.current-hashes.outputs.current_ngs }}
         NGS_HASH: ${{ steps.get-commits.outputs.ngs_hash }}
         PR_URL: ${{ steps.create-pr.outputs.pull-request-url }}
       run: |
@@ -222,6 +248,8 @@ jobs:
               ":white_check_mark: *${GITHUB_REPOSITORY} update-requirements*: opened PR for updated requirements.cachito" \
               "• Ironic previous: \`${CURRENT_IRONIC}\`" \
               "• Ironic new: \`${IRONIC_HASH}\`" \
+              "• Ironic Prometheus Exporter previous: \`${CURRENT_IPE}\`" \
+              "• Ironic Prometheus Exporter new: \`${IPE_HASH}\`" \
               "• Sushy previous: \`${CURRENT_SUSHY}\`" \
               "• Sushy new: \`${SUSHY_HASH}\`" \
               "• Networking Generic Switch previous: \`${CURRENT_NGS}\`" \
