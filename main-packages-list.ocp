@@ -88,3 +88,4 @@ qemu-img
 sqlite
 util-linux
 xorriso
+crypto-policies-scripts

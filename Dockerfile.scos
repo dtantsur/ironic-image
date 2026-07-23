@@ -26,6 +26,9 @@ RUN prepare-image.sh && \
     /bin/prepare-ipxe.sh && \
     rm -f /bin/prepare-ipxe.sh
 
+# Add PQC support until we have pqc enabled ubi minimal images available
+RUN update-crypto-policies --set DEFAULT:PQ
+
 # IRONIC #
 COPY --from=builder /tmp/uefi_esp_*.img /tmp/
 
