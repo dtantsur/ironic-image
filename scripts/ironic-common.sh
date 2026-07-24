@@ -9,6 +9,11 @@ PROVISIONING_INTERFACE="${PROVISIONING_INTERFACE:-}"
 PROVISIONING_IP="${PROVISIONING_IP:-}"
 PROVISIONING_MACS="${PROVISIONING_MACS:-}"
 IPXE_CUSTOM_FIRMWARE_DIR="${IPXE_CUSTOM_FIRMWARE_DIR:-/shared/custom_ipxe_firmware}"
+# Basename of the EFI iPXE binaries (<basename>-x86_64.efi / <basename>-arm64.efi).
+# Upstream builds them as "snponly"; distros packaging iPXE differently (e.g.
+# openSUSE/SLE ship "snp") can override this via env or a downstream patch. Used
+# both when copying the binaries and in dnsmasq.conf.j2 that advertises them.
+export SNP_BASENAME="${SNP_BASENAME:-snponly}"
 CUSTOM_CONFIG_DIR="${CUSTOM_CONFIG_DIR:-/conf}"
 CUSTOM_DATA_DIR="${CUSTOM_DATA_DIR:-/data}"
 export DNSMASQ_CONF_DIR="${CUSTOM_CONFIG_DIR}/dnsmasq"
@@ -40,6 +45,32 @@ export IRONIC_USE_MARIADB="${IRONIC_USE_MARIADB:-false}"
 
 # Allow override in ironic-networking use cases
 export IRONIC_FORCE_DHCP="${IRONIC_FORCE_DHCP:-false}"
+
+export IRONIC_FAST_TRACK="${IRONIC_FAST_TRACK:-true}"
+
+# Copy iPXE firmware binaries from a source directory into a destination
+# directory. The EFI binary basename is taken from ${SNP_BASENAME} so the served
+# name (dnsmasq.conf.j2) and the on-disk name always agree; downstreams whose
+# distro 'ipxe' package names them differently (e.g. openSUSE/SLE ship
+# snp-<arch>.efi) just override SNP_BASENAME. Missing files are skipped; it is
+# fatal only if no usable iPXE binary was copied.
+copy_ipxe_firmware()
+{
+    local src_dir="$1" dst_dir="$2" fw_file
+    for fw_file in undionly.kpxe "${SNP_BASENAME}-x86_64.efi" "${SNP_BASENAME}-arm64.efi"; do
+        if [[ -f "${src_dir}/${fw_file}" ]]; then
+            cp "${src_dir}/${fw_file}" "${dst_dir}/${fw_file}"
+        else
+            echo "INFO: ${src_dir}/${fw_file} is unavailable, skipping."
+        fi
+    done
+
+    # Validate that at least one legacy bios and one efi iPXE binary was successfully copied
+    if ! ls "${dst_dir}/"*.{kpxe,efi} &>/dev/null; then
+        echo "ERROR: No iPXE firmware files found in ${dst_dir} after copying from ${src_dir}!"
+        exit 1
+    fi
+}
 
 get_provisioning_interface()
 {
@@ -100,10 +131,20 @@ parse_ip_address()
 # Wait for the interface or IP to be up, sets $IRONIC_IP
 wait_for_interface_or_ip()
 {
-    # If $PROVISIONING_IP is specified, then we wait for that to become
-    # available on an interface, otherwise we look at $PROVISIONING_INTERFACE
-    # for an IP
-    if [[ -n "${PROVISIONING_IP}" ]]; then
+    # IRONIC_IP already defined overrides everything else
+    if [[ -n "${IRONIC_IP}" ]]; then
+        local PARSED_IP
+        PARSED_IP="$(parse_ip_address "${IRONIC_IP}")"
+        if [[ -z "${PARSED_IP}" ]]; then
+            echo "ERROR: PROVISIONING_IP contains an invalid IP address, failed to start ironic"
+            exit 1
+        fi
+
+        export IRONIC_IP="${PARSED_IP}"
+    elif [[ -n "${PROVISIONING_IP}" ]]; then
+        # If $PROVISIONING_IP is specified, then we wait for that to become
+        # available on an interface, otherwise we look at $PROVISIONING_INTERFACE
+        # for an IP
         local PARSED_IP
         PARSED_IP="$(parse_ip_address "${PROVISIONING_IP}")"
         if [[ -z "${PARSED_IP}" ]]; then
@@ -122,13 +163,16 @@ wait_for_interface_or_ip()
 
         export PROVISIONING_INTERFACE="${IFACE_OF_IP}"
         export IRONIC_IP="${PARSED_IP}"
-    else
+    elif [[ -n "${PROVISIONING_INTERFACE}" ]]; then
         until [[ -n "$IRONIC_IP" ]]; do
             echo "Waiting for ${PROVISIONING_INTERFACE} interface to be configured"
             IRONIC_IP="$(ip -br addr show scope global up dev "${PROVISIONING_INTERFACE}" | awk '{print $3}' | sed -e 's%/.*%%' | head -n 1)"
             export IRONIC_IP
             sleep 1
         done
+    else
+        echo "ERROR: cannot determine an interface or an IP for binding and creating URLs"
+        return 1
     fi
 
     # If the IP contains a colon, then it's an IPv6 address, and the HTTP
@@ -210,6 +254,7 @@ detect_ipa_by_arch()
     fi
 
     # Detect architectures from env vars (DEPLOY_KERNEL_URL_<ARCH>) and files
+    local var_arch file_arch
     declare -A detected_arch
     for var_arch in "${!DEPLOY_KERNEL_URL_@}"; do
         local IPA_ARCH="${var_arch#DEPLOY_KERNEL_URL_}"
