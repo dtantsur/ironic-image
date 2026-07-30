@@ -10,6 +10,7 @@ FROM quay.io/centos/centos:stream9
 
 ENV PKGS_LIST=main-packages-list.okd
 ARG EXTRA_PKGS_LIST
+ARG DNSMASQ_DATA_DIR=/data/dnsmasq
 
 COPY ${PKGS_LIST} ${EXTRA_PKGS_LIST:-$PKGS_LIST} python-requirements.okd /tmp/
 COPY ironic-config/inspector.ipxe.j2 ironic-config/httpd-ironic-api.conf.j2 \

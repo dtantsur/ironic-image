@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-set -eux
+set -euxo pipefail
 
 # shellcheck disable=SC1091
 . /bin/ironic-common.sh
@@ -8,6 +8,7 @@ set -eux
 . /bin/tls-common.sh
 
 DNSMASQ_EXCEPT_INTERFACE=${DNSMASQ_EXCEPT_INTERFACE:-lo}
+TFTP_BOOT_DIR="/shared/tftpboot"
 export DNS_PORT=${DNS_PORT:-0}
 
 wait_for_interface_or_ip
@@ -19,26 +20,20 @@ if [[ "${DNS_IP:-}" == "provisioning" ]]; then
     fi
 fi
 
-mkdir -p /shared/tftpboot
-mkdir -p /shared/tftpboot/arm64-efi
-mkdir -p /shared/html/images
+mkdir -p "${TFTP_BOOT_DIR}"
+mkdir -p /shared/html
+touch "${DNSMASQ_DATA_DIR}/dnsmasq.leases"
 
-# Copy files to shared mount
+# Copy files to shared mount. Prefer a user-provided custom firmware dir,
+# otherwise fall back to the image's built-in /tftpboot.
 if [[ -r "${IPXE_CUSTOM_FIRMWARE_DIR}" ]]; then
-    cp "${IPXE_CUSTOM_FIRMWARE_DIR}/undionly.kpxe" \
-        "${IPXE_CUSTOM_FIRMWARE_DIR}/snponly.efi" \
-        "/shared/tftpboot"
-    cp "${IPXE_CUSTOM_FIRMWARE_DIR}/arm64-efi/snponly.efi" \
-        "/shared/tftpboot/arm64-efi"
+    copy_ipxe_firmware "${IPXE_CUSTOM_FIRMWARE_DIR}" "${TFTP_BOOT_DIR}"
 else
-    cp /tftpboot/undionly.kpxe /tftpboot/snponly.efi /shared/tftpboot
-    cp /tftpboot/arm64-efi/snponly.efi /shared/tftpboot/arm64-efi
+    copy_ipxe_firmware /tftpboot "${TFTP_BOOT_DIR}"
 fi
 
 # Template and write dnsmasq.conf
-# we template via /tmp as sed otherwise creates temp files in /etc directory
-# where we can't write
-python3.12 -c 'import os; import sys; import jinja2; sys.stdout.write(jinja2.Template(sys.stdin.read()).render(env=os.environ))' <"/templates/dnsmasq.conf.j2" >"${DNSMASQ_TEMP_DIR}/dnsmasq_temp.conf"
+render_j2_config "/templates/dnsmasq.conf.j2" "${DNSMASQ_TEMP_DIR}/dnsmasq_temp.conf"
 
 for iface in $(echo "$DNSMASQ_EXCEPT_INTERFACE" | tr ',' ' '); do
     sed -i -e "/^interface=.*/ a\except-interface=${iface}" "${DNSMASQ_TEMP_DIR}/dnsmasq_temp.conf"

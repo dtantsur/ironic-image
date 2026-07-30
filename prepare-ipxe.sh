@@ -6,12 +6,16 @@
 # the expected images are available at build-time. Otherwise the CI
 # jobs that build these images could succeed, but provisioning
 # will actually fail without the images present.
+#
+# The target filenames must match the SNP_BASENAME convention used by
+# copy_ipxe_firmware() in ironic-common.sh and dnsmasq.conf.j2:
+#   <SNP_BASENAME>-x86_64.efi / <SNP_BASENAME>-arm64.efi
+# SNP_BASENAME defaults to "snponly".
 
 set -ex
 
 mkdir -p /tftpboot
-mkdir -p /tftpboot/arm64-efi
 
 cp /usr/share/ipxe/undionly.kpxe /tftpboot/
-cp /usr/share/ipxe/ipxe-snponly-x86_64.efi /tftpboot/snponly.efi
-cp /usr/share/ipxe/arm64-efi/snponly.efi /tftpboot/arm64-efi/snponly.efi
+cp /usr/share/ipxe/ipxe-snponly-x86_64.efi /tftpboot/snponly-x86_64.efi
+cp /usr/share/ipxe/arm64-efi/snponly.efi /tftpboot/snponly-arm64.efi
