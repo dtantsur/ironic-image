@@ -11,10 +11,10 @@
 # Note: this will fail CI checks (check-requirements.sh) and the downstream
 # Cachito build pipeline, so revert before submitting a PR.
 
-ironic @ git+https://github.com/openshift/openstack-ironic@c413c7b1bf590178ed1839a6440ed2e3280f6e2c
-ironic-prometheus-exporter @ git+https://github.com/openshift/openstack-ironic-prometheus-exporter@b1abbf9b00e9e9a509f54a2890f4474dd9c1657f
-sushy @ git+https://github.com/openshift/openstack-sushy@13acced61644ab5a2ff88eff498cd599d16fde42
-networking-generic-switch @ git+https://github.com/openshift/openstack-networking-generic-switch@700f180491220ddd3a606768c792411a7fdfe364
+ironic @ git+https://github.com/openshift/openstack-ironic@7fb9cfd7db12adfa6fde5bc38609462315edf99b
+ironic-prometheus-exporter @ git+https://github.com/openshift/openstack-ironic-prometheus-exporter@87e6f36f732ddd4d72f13739e03901626546b187
+sushy @ git+https://github.com/openshift/openstack-sushy@71fe4a461b360bfa52b72db7dc9e5f7c42d8bf4e
+networking-generic-switch @ git+https://github.com/openshift/openstack-networking-generic-switch@747b474d376c3dcdddaae029b055f959e05915c9
 
 # HARDWARE DRIVERS DEPENDENCIES
 proliantutils===2.16.3
@@ -51,7 +51,7 @@ oslo.log===7.2.1
 oslo.messaging===17.1.0
 oslo.metrics===0.11.0
 oslo.middleware===7.0.0
-oslo.policy===4.7.0
+oslo.policy===6.0.0
 oslo.serialization===5.8.0
 oslo.service===4.4.1
 oslo.upgradecheck===2.6.0
