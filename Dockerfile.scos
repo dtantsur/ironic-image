@@ -27,8 +27,10 @@ RUN prepare-image.sh && \
     /bin/prepare-ipxe.sh && \
     rm -f /bin/prepare-ipxe.sh
 
-# Add PQC support until we have pqc enabled ubi minimal images available
-RUN update-crypto-policies --set DEFAULT:PQ
+# Add PQC support - on Stream 9 apply the PQ subpolicy; Skip if on Stream 10+ as PQ is already in DEFAULT
+RUN if [ -f /usr/share/crypto-policies/policies/modules/PQ.pmod ]; then \
+      update-crypto-policies --set DEFAULT:PQ; \
+    fi
 
 # IRONIC #
 COPY --from=builder /tmp/uefi_esp_*.img /tmp/
